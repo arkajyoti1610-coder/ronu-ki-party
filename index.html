@@ -1,0 +1,194 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#090711">
+<title>Ronu ki Party :)</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;background:#090711;color:#fff;
+ font-family:Arial,sans-serif;min-height:100vh;
+ background-image:radial-gradient(ellipse at 80% 0%,#42208055,transparent 48%);
+}
+header{padding:24px 20px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:21px;font-weight:900;letter-spacing:-1px}
+.logo span{color:#b58aff}
+.status{font-size:11px;color:#c5b5e7;background:#211631;padding:9px 12px;border-radius:20px}
+main{padding:30px 22px;max-width:480px;margin:auto}
+h1{font-size:38px;line-height:1.12;letter-spacing:-1.5px;margin:12px 0}
+h1 span{color:#b68aff}
+.sub{color:#a59bb4;line-height:1.6;font-size:14px}
+.panel{background:linear-gradient(145deg,#1c152b,#100d19);border:1px solid #392950;border-radius:22px;padding:22px;margin-top:28px}
+label{display:block;color:#c5b9d7;font-size:12px;margin:17px 0 8px}
+input{width:100%;padding:16px;background:#0b0912;border:1px solid #41304f;border-radius:12px;color:white;font-size:16px;outline:none}
+input:focus{border-color:#ae7cff}
+button{border:0;border-radius:12px;padding:16px;font-size:15px;font-weight:bold;cursor:pointer}
+.primary{width:100%;background:linear-gradient(100deg,#9b5cf6,#7038d6);color:white;margin-top:17px}
+.secondary{width:100%;background:#251a35;color:white;border:1px solid #49315f;margin-top:12px}
+.divider{display:flex;align-items:center;gap:12px;color:#766d83;font-size:11px;margin:19px 0}
+.divider:before,.divider:after{content:"";height:1px;background:#352941;flex:1}
+.note{font-size:11px;color:#81768e;text-align:center;margin-top:20px}
+.hidden{display:none!important}
+.roomcode{font-size:35px;letter-spacing:9px;text-align:center;color:#c39aff;font-weight:bold;padding:20px}
+.messages{height:230px;overflow:auto;background:#0b0912;border-radius:13px;padding:12px}
+.msg{padding:10px;background:#21182d;border-radius:12px;margin:8px 0;font-size:13px}
+.chatrow{display:flex;gap:7px;margin-top:12px}
+.chatrow input{min-width:0}
+.chatrow button{background:#9858ef;color:white}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
+.actions button{background:#241832;color:white;border:1px solid #48305e}
+.actions button.active{background:#7139b6}
+footer{text-align:center;color:#625970;font-size:11px;padding:35px}
+.back{background:transparent;color:#c49aff;padding:8px 0}
+</style>
+</head>
+<body>
+<header>
+ <div class="logo">RONU KI <span>PARTY :)</span></div>
+ <div class="status">● PARTY MODE</div>
+</header>
+
+<main>
+<section id="home">
+ <p style="color:#b58aff;font-size:12px;letter-spacing:3px">YOUR PEOPLE. YOUR VIBE.</p>
+ <h1>Good friends.<br><span>Crazy parties.</span></h1>
+ <p class="sub">Create a room, invite your favourite people and let the madness begin.</p>
+
+ <div class="panel">
+  <h2 style="margin:0">Who's joining? 👀</h2>
+  <label>Your nickname</label>
+  <input id="nickname" placeholder="Choose any name..." maxlength="20">
+
+  <button class="primary" onclick="createParty()">✦ Create a Party</button>
+  <div class="divider">OR JOIN YOUR FRIENDS</div>
+  <label>Enter 4-digit party code</label>
+  <input id="joincode" placeholder="0000" maxlength="4" inputmode="numeric">
+  <button class="secondary" onclick="joinParty()">Join Party →</button>
+ </div>
+ <p class="note">No boring introductions. Just good vibes. 💜</p>
+</section>
+
+<section id="room" class="hidden">
+ <button class="back" onclick="goHome()">← Leave party</button>
+ <p style="color:#b58aff;letter-spacing:2px;font-size:11px">YOU'RE IN A PARTY</p>
+ <h1>Welcome to<br><span>the madness.</span></h1>
+ <div class="panel">
+  <p class="sub" style="text-align:center">SHARE THIS FOUR-DIGIT CODE</p>
+  <div class="roomcode" id="roomcode">0000</div>
+  <button class="secondary" onclick="copyCode()">Copy party code</button>
+  <p id="roomstatus" class="note">Prototype room • Local demo only</p>
+ </div>
+ <div class="actions">
+  <button id="voiceBtn" class="active" onclick="selectMode('voice')">🎙 Voice chat</button>
+  <button id="textBtn" onclick="selectMode('text')">💬 Text chat</button>
+ </div>
+ <div class="panel">
+  <div id="voice">
+   <h3>Voice Lounge 🎧</h3>
+   <p class="sub">Your voice party starts here.</p>
+   <button class="primary" onclick="mic()">🎙 Enable microphone</button>
+   <p id="micstatus" class="note">Microphone not connected</p>
+  </div>
+  <div id="text" class="hidden">
+   <h3>Party Chat 💬</h3>
+   <div class="messages" id="messages">
+    <div class="msg">💜 Welcome to the party!</div>
+   </div>
+   <div class="chatrow">
+    <input id="message" placeholder="Say something crazy...">
+    <button onclick="sendMessage()">Send</button>
+   </div>
+  </div>
+ </div>
+</section>
+</main>
+<footer>MADE FOR FRIENDS · RONU KI PARTY :)</footer>
+
+<script>
+let currentCode="";
+let currentMode="voice";
+
+function nickname(){
+ let n=document.getElementById('nickname').value.trim();
+ if(!n){alert("Choose a nickname first!");return null;}
+ return n;
+}
+
+function openRoom(code){
+ currentCode=code;
+ document.getElementById('roomcode').textContent=code;
+ document.getElementById('home').classList.add('hidden');
+ document.getElementById('room').classList.remove('hidden');
+ selectMode('voice');
+}
+
+function createParty(){
+ if(!nickname())return;
+ let code=String(Math.floor(1000+Math.random()*9000));
+ openRoom(code);
+}
+
+function joinParty(){
+ if(!nickname())return;
+ let code=document.getElementById('joincode').value.trim();
+ if(!/^\d{4}$/.test(code)){
+ alert("Please enter a valid 4-digit code.");
+ return;
+ }
+ openRoom(code);
+ document.getElementById('roomstatus').textContent="Joined demo room "+code;
+}
+
+function goHome(){
+ document.getElementById('room').classList.add('hidden');
+ document.getElementById('home').classList.remove('hidden');
+}
+
+function copyCode(){
+ if(navigator.clipboard){
+ navigator.clipboard.writeText(currentCode).then(()=>alert("Party code copied!"));
+ }else{alert("Your party code is "+currentCode);}
+}
+
+function selectMode(mode){
+ currentMode=mode;
+ document.getElementById('voice').classList.toggle('hidden',mode!=='voice');
+ document.getElementById('text').classList.toggle('hidden',mode!=='text');
+ document.getElementById('voiceBtn').classList.toggle('active',mode==='voice');
+ document.getElementById('textBtn').classList.toggle('active',mode==='text');
+}
+
+function sendMessage(){
+ let input=document.getElementById('message');
+ let value=input.value.trim();
+ if(!value)return;
+ let item=document.createElement('div');
+ item.className='msg';
+ item.textContent=document.getElementById('nickname').value+": "+value;
+ document.getElementById('messages').appendChild(item);
+ input.value="";
+ document.getElementById('messages').scrollTop=99999;
+}
+
+function mic(){
+ if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+ alert("Microphone access is unavailable in this preview.");
+ return;
+ }
+ navigator.mediaDevices.getUserMedia({audio:true})
+ .then(stream=>{
+ document.getElementById('micstatus').textContent="Microphone permission granted ✓ (demo only)";
+ stream.getTracks().forEach(track=>track.stop());
+ })
+ .catch(()=>alert("Microphone permission denied or unavailable."));
+}
+
+document.getElementById('message').addEventListener('keydown',e=>{
+ if(e.key==='Enter')sendMessage();
+});
+</script>
+</body>
+</html>
