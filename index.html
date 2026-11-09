@@ -20,21 +20,34 @@ h1{font-size:39px;letter-spacing:-1.5px;line-height:1.1}
 label{display:block;font-size:12px;color:#c8b9dc;margin:17px 0 8px}
 input{width:100%;padding:16px;background:#0b0912;border:1px solid #493357;border-radius:12px;color:white;font-size:16px;outline:none}
 input:focus{border-color:#b58aff}
-button{border:0;border-radius:12px;padding:15px;font-weight:bold;font-size:14px;cursor:pointer}
-.primary{width:100%;background:linear-gradient(100deg,#9b5cf6,#7038d6);color:white;margin-top:17px}
-.secondary{width:100%;background:#251a35;color:white;border:1px solid #49315f;margin-top:12px}
+button{border:0;border-radius:12px;padding:15px;font-weight:bold;font-size:14px;cursor:pointer;color:white}
+button:disabled{opacity:.5}
+.primary{width:100%;background:linear-gradient(100deg,#9b5cf6,#7038d6);margin-top:17px}
+.secondary{width:100%;background:#251a35;border:1px solid #49315f;margin-top:12px}
 .hidden{display:none!important}
 .divider{text-align:center;color:#81748e;font-size:11px;margin:20px}
 .code{font-size:38px;letter-spacing:9px;text-align:center;color:#c39aff;font-weight:bold;padding:15px}
-.messages{height:300px;overflow:auto;background:#0b0912;border-radius:13px;padding:12px}
+.messages{height:260px;overflow:auto;background:#0b0912;border-radius:13px;padding:12px}
 .msg{padding:11px;background:#241a31;border-radius:12px;margin:9px 0;overflow-wrap:anywhere;font-size:13px}
 .chatrow{display:flex;gap:8px;margin-top:12px}
 .chatrow input{min-width:0}
-.chatrow button{background:#9858ef;color:white}
+.chatrow button{background:#9858ef}
 .note{text-align:center;color:#81758d;font-size:11px;margin-top:18px}
 .back{background:transparent;color:#c49aff;padding:8px 0}
 #error{color:#ff9999;font-size:12px;line-height:1.5}
 #success{color:#bca0ff;font-size:12px;line-height:1.5}
+.voice-title{display:flex;justify-content:space-between;align-items:center}
+.voice-status{font-size:11px;color:#bca0ff}
+.voice-buttons{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:15px}
+.voice-buttons button{margin:0;min-height:52px}
+.mic-on{background:linear-gradient(100deg,#8b4de0,#5425a0)}
+.mic-off{background:#302238;border:1px solid #674b77}
+.ptt{grid-column:1/-1;background:linear-gradient(100deg,#a45cff,#6932d2);touch-action:none;user-select:none}
+.ptt.active{background:#d34e87;transform:scale(.98)}
+.people{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.person{padding:11px 13px;background:#0b0912;border:1px solid #332442;border-radius:11px;font-size:13px;display:flex;justify-content:space-between}
+#errorVoice{color:#ff9999;font-size:12px;line-height:1.5}
+#remoteAudio{display:none}
 </style>
 </head>
 <body>
@@ -66,12 +79,36 @@ button{border:0;border-radius:12px;padding:15px;font-weight:bold;font-size:14px;
  <button class="back" onclick="leaveParty()">← Leave party</button>
  <p style="color:#b58aff;letter-spacing:2px;font-size:11px">YOUR PARTY ROOM</p>
  <h1>Welcome to<br><span>the madness.</span></h1>
+
  <div class="panel">
   <p class="sub" style="text-align:center">SHARE THIS CODE WITH YOUR FRIENDS</p>
   <div class="code" id="roomcode">0000</div>
   <button class="secondary" onclick="copyCode()">Copy party code</button>
   <p class="note" id="roominfo">Connecting...</p>
  </div>
+
+ <div class="panel">
+  <div class="voice-title">
+   <h3>🎙️ Voice Lounge</h3>
+   <span class="voice-status" id="voiceStatus">Not connected</span>
+  </div>
+  <p class="sub">Talk with everyone in your party in real time.</p>
+  <button class="primary" id="joinVoiceBtn" onclick="joinVoice()">Join Voice Party</button>
+  <div id="voiceControls" class="hidden">
+   <div class="voice-buttons">
+    <button id="openMicBtn" class="mic-off" onclick="toggleOpenMic()">🎙️ Open Mic: OFF</button>
+    <button class="secondary" onclick="toggleSpeaker()">🔊 Speaker: ON</button>
+    <button id="pttBtn" class="ptt">HOLD TO TALK</button>
+   </div>
+   <p class="note">Hold the purple button to speak. Turn on Open Mic for hands-free talking.</p>
+   <h4>People in voice</h4>
+   <div id="people" class="people"></div>
+   <button class="secondary" onclick="leaveVoice()">Leave Voice</button>
+  </div>
+  <p id="errorVoice"></p>
+  <div id="remoteAudio"></div>
+ </div>
+
  <div class="panel">
   <h3>💬 Live Party Chat</h3>
   <div class="messages" id="messages"></div>
@@ -85,15 +122,24 @@ button{border:0;border-radius:12px;padding:15px;font-weight:bold;font-size:14px;
 </section>
 </main>
 
-<script>
+<script type="module">
+import { Room, RoomEvent, Track, TokenSource } from
+ 'https://esm.sh/livekit-client@2.23.0';
+
 const SUPABASE_URL = "https://xwtyousdciguodjtvtpq.supabase.co";
 const SUPABASE_KEY = "sb_publishable__TV1ItZfG_W4J7yOyK4wyA_At1OZLZW";
+const LIVEKIT_TOKEN_SERVER_ID = "ronukiparty-2d4v2i";
 
 const db = window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const tokenSource = TokenSource.developmentTokenServer(LIVEKIT_TOKEN_SERVER_ID);
 
 let currentRoom = null;
 let currentName = "";
 let channel = null;
+let voiceRoom = null;
+let openMic = false;
+let speakerOn = true;
+let remoteTracks = [];
 
 function showError(message){
  document.getElementById("error").textContent=message;
@@ -119,13 +165,10 @@ async function createParty(){
  const button=document.querySelector("#home .primary");
  button.disabled=true;
  try{
-  let code;
-  let created=false;
+  let code,created=false;
   for(let i=0;i<10;i++){
    code=String(Math.floor(1000+Math.random()*9000));
-   const {error}=await db.from("rooms").insert({
-    code:code,host_name:currentName
-   });
+   const {error}=await db.from("rooms").insert({code,host_name:currentName});
    if(!error){created=true;break;}
    if(error.code!=="23505")throw error;
   }
@@ -165,16 +208,12 @@ async function connectChat(){
   const {data,error}=await db.from("messages")
    .select("id,sender_name,content,created_at")
    .eq("room_code",currentRoom)
-   .order("created_at",{ascending:true})
-   .limit(100);
+   .order("created_at",{ascending:true}).limit(100);
   if(error)throw error;
   data.forEach(addMessage);
-
   channel=db.channel("party-"+currentRoom)
    .on("postgres_changes",{
-    event:"INSERT",
-    schema:"public",
-    table:"messages",
+    event:"INSERT",schema:"public",table:"messages",
     filter:"room_code=eq."+currentRoom
    },payload=>addMessage(payload.new))
    .subscribe(status=>{
@@ -192,9 +231,7 @@ async function sendMessage(){
  input.disabled=true;
  try{
   const {error}=await db.from("messages").insert({
-   room_code:currentRoom,
-   sender_name:currentName,
-   content:content
+   room_code:currentRoom,sender_name:currentName,content
   });
   if(error)throw error;
   input.value="";
@@ -211,17 +248,150 @@ async function copyCode(){
   document.getElementById("success").textContent="Your code is "+currentRoom;
  }
 }
-async function leaveParty(){
- if(channel){await db.removeChannel(channel);channel=null;}
- currentRoom=null;
- document.getElementById("room").classList.add("hidden");
- document.getElementById("home").classList.remove("hidden");
+
+/* LIVEKIT VOICE */
+function voiceMessage(message){
+ document.getElementById("errorVoice").textContent=message;
 }
+function renderPeople(){
+ if(!voiceRoom)return;
+ const box=document.getElementById("people");
+ box.innerHTML="";
+ const all=[voiceRoom.localParticipant,...voiceRoom.remoteParticipants.values()];
+ all.forEach(p=>{
+  const row=document.createElement("div");
+  row.className="person";
+  const name=document.createElement("span");
+  name.textContent=(p.name||p.identity)+(p===voiceRoom.localParticipant?" (You)":"");
+  const state=document.createElement("span");
+  state.textContent=p.isSpeaking?"🟢 Speaking":"🎧 Connected";
+  row.append(name,state);
+  box.appendChild(row);
+ });
+}
+async function joinVoice(){
+ if(!currentRoom||voiceRoom)return;
+ const btn=document.getElementById("joinVoiceBtn");
+ btn.disabled=true;
+ voiceMessage("");
+ document.getElementById("voiceStatus").textContent="Connecting...";
+ try{
+  const roomName="ronu-party-"+currentRoom;
+  const {serverUrl,participantToken}=await tokenSource.fetch({roomName});
+  const room=new Room();
+  voiceRoom=room;
+
+  room.on(RoomEvent.ParticipantConnected,renderPeople);
+  room.on(RoomEvent.ParticipantDisconnected,renderPeople);
+  room.on(RoomEvent.ActiveSpeakersChanged,renderPeople);
+  room.on(RoomEvent.TrackSubscribed,(track,publication,participant)=>{
+   if(track.kind===Track.Kind.Audio){
+    const audio=track.attach();
+    audio.autoplay=true;
+    audio.playsInline=true;
+    audio.muted=!speakerOn;
+    document.getElementById("remoteAudio").appendChild(audio);
+    remoteTracks.push({track,audio});
+   }
+   renderPeople();
+  });
+  room.on(RoomEvent.TrackUnsubscribed,(track)=>{
+   track.detach().forEach(el=>el.remove());
+   remoteTracks=remoteTracks.filter(x=>x.track!==track);
+  });
+  room.on(RoomEvent.Disconnected,()=>{
+   document.getElementById("voiceStatus").textContent="Disconnected";
+  });
+
+  await room.connect(serverUrl,participantToken);
+  await room.localParticipant.setName(currentName);
+  await room.localParticipant.setMicrophoneEnabled(false);
+
+  document.getElementById("joinVoiceBtn").classList.add("hidden");
+  document.getElementById("voiceControls").classList.remove("hidden");
+  document.getElementById("voiceStatus").textContent="🟢 Connected";
+  renderPeople();
+ }catch(e){
+  voiceRoom=null;
+  btn.disabled=false;
+  document.getElementById("voiceStatus").textContent="Not connected";
+  voiceMessage("Voice connection failed: "+e.message);
+ }
+}
+async function toggleOpenMic(){
+ if(!voiceRoom)return;
+ try{
+  openMic=!openMic;
+  await voiceRoom.localParticipant.setMicrophoneEnabled(openMic);
+  const btn=document.getElementById("openMicBtn");
+  btn.textContent=openMic?"🎙️ Open Mic: ON":"🎙️ Open Mic: OFF";
+  btn.className=openMic?"mic-on":"mic-off";
+ }catch(e){voiceMessage("Microphone error: "+e.message);}
+}
+async function pushToTalk(start){
+ if(!voiceRoom||openMic)return;
+ try{
+  await voiceRoom.localParticipant.setMicrophoneEnabled(start);
+  document.getElementById("pttBtn").classList.toggle("active",start);
+  document.getElementById("pttBtn").textContent=start?"🎙️ SPEAKING...":"HOLD TO TALK";
+ }catch(e){voiceMessage("Microphone error: "+e.message);}
+}
+function toggleSpeaker(){
+ speakerOn=!speakerOn;
+ remoteTracks.forEach(x=>x.audio.muted=!speakerOn);
+ document.querySelector('[onclick="toggleSpeaker()"]').textContent=
+  speakerOn?"🔊 Speaker: ON":"🔇 Speaker: OFF";
+}
+async function leaveVoice(){
+ if(!voiceRoom)return;
+ const oldRoom=voiceRoom;
+ voiceRoom=null;
+ openMic=false;
+ await oldRoom.disconnect();
+ remoteTracks.forEach(x=>x.track.detach().forEach(el=>el.remove()));
+ remoteTracks=[];
+ document.getElementById("remoteAudio").innerHTML="";
+ document.getElementById("voiceControls").classList.add("hidden");
+ const btn=document.getElementById("joinVoiceBtn");
+ btn.classList.remove("hidden");
+ btn.disabled=false;
+ document.getElementById("voiceStatus").textContent="Not connected";
+ document.getElementById("openMicBtn").textContent="🎙️ Open Mic: OFF";
+ document.getElementById("openMicBtn").className="mic-off";
+ document.getElementById("pttBtn").textContent="HOLD TO TALK";
+ document.getElementById("pttBtn").classList.remove("active");
+ document.getElementById("people").innerHTML="";
+ voiceMessage("");
+}
+
+/* BUTTONS AND PHONE TOUCH CONTROLS */
+const ptt=document.getElementById("pttBtn");
+ptt.addEventListener("pointerdown",e=>{
+ e.preventDefault();
+ ptt.setPointerCapture(e.pointerId);
+ pushToTalk(true);
+});
+["pointerup","pointercancel","lostpointercapture"].forEach(event=>{
+ ptt.addEventListener(event,()=>pushToTalk(false));
+});
+
 document.getElementById("message").addEventListener("keydown",e=>{
  if(e.key==="Enter")sendMessage();
 });
 document.getElementById("joincode").addEventListener("input",e=>{
  e.target.value=e.target.value.replace(/\D/g,"");
+});
+
+async function leaveParty(){
+ await leaveVoice();
+ if(channel){await db.removeChannel(channel);channel=null;}
+ currentRoom=null;
+ document.getElementById("room").classList.add("hidden");
+ document.getElementById("home").classList.remove("hidden");
+}
+Object.assign(window,{
+ createParty,joinParty,sendMessage,copyCode,leaveParty,
+ joinVoice,toggleOpenMic,toggleSpeaker,leaveVoice
 });
 </script>
 </body>
