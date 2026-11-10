@@ -5,22 +5,17 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "Ronu_ki_Party_Android_Builder.zip"
+      - "android-wrapper/**"
       - ".github/workflows/build-apk.yml"
+      - "Ronu_ki_Party_Android_Builder.zip"
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Check out repository
         uses: actions/checkout@v4
-
-      - name: Extract Android builder
-        run: |
-          mkdir -p /tmp/ronu-builder
-          unzip -o Ronu_ki_Party_Android_Builder.zip -d /tmp/ronu-builder
-          cp -R /tmp/ronu-builder/android-wrapper ./android-wrapper
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -28,12 +23,19 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Extract Android project
+        run: |
+          mkdir -p extracted
+          unzip -q Ronu_ki_Party_Android_Builder.zip -d extracted
+          cp -R extracted/android-wrapper ./android-wrapper
+          test -f android-wrapper/app/src/main/java/com/ronukiparty/app/MainActivity.java
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
 
-      - name: Build APK
+      - name: Build debug APK
         working-directory: android-wrapper
         run: gradle assembleDebug
 
